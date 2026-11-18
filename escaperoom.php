@@ -41,9 +41,17 @@ function add_item(string $item): void {
 function clean(string $s): string { return strtolower(trim($s)); }
 function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
+// [ADDED] BUG FIX: a tampered form (e.g. answer[]=x or code[]=1) sent an array where the code
+// expects a string, which crashed the page with a fatal TypeError (HTTP 500).
+// post_str() returns the posted value only if it is a plain string, otherwise ''.
+function post_str(string $key): string {
+    $v = $_POST[$key] ?? '';
+    return is_string($v) ? $v : '';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $view   = $_POST['view'] ?? 'room';
+    $action = post_str('action');
+    $view   = post_str('view');
     if (!in_array($view, $VIEWS, true)) $view = 'room';
 
     switch ($action) {
@@ -69,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             go('desk');
 
         case 'answer':
-            $puzzle = $_POST['puzzle'] ?? '';
-            $given  = clean($_POST['answer'] ?? '');
+            $puzzle = post_str('puzzle');
+            $given  = clean(post_str('answer'));
             if (!isset($ANSWERS[$puzzle])) go('room');
 
             if ($puzzle === 'cipher' && empty($_SESSION['solved']['drawer'])) {
