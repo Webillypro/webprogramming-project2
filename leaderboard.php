@@ -30,6 +30,12 @@ if ($finished) {
     }
 }
 
+// [ADDED] This player's final rank (1 = best) and how many scores are on the board.
+// $myRank stays null if the score is not in scores.json (for example, the save failed).
+$myRank      = ($myIndex !== null) ? $myIndex + 1 : null;
+$totalScores = count($scores);
+// [END ADDED]
+
 // A game is running but not finished: offer a way back.
 $inProgress = !empty($_SESSION['player_name']) && !empty($_SESSION['start_time']) && empty($_SESSION['end_time']);
 
@@ -55,18 +61,39 @@ $shown = array_slice($scores, 0, BOARD_SIZE, true);
         <?php if ($finished): ?>
             <div class="result-card">
                 <h2>The vault swings open!</h2>
-                <p>Well done, <strong><?= h($myName) ?></strong>. You escaped.</p>
-                <p>Score: <strong><?= $myScore ?></strong> &nbsp;|&nbsp;
-                   Time: <strong><?= h(format_time($myTime)) ?></strong> &nbsp;|&nbsp;
-                   Hints used: <strong><?= $myHints ?></strong></p>
+                <!-- [MODIFIED] was: "Well done, NAME. You escaped." plus one line of Score | Time | Hints.
+                     The name, score and time now each have their own box below, together with the rank. -->
+                <p>Well done, you escaped the study!</p>
+
+                <!-- [ADDED] final result: rank, player name, final score and clear time -->
+                <div class="result-stats">
+                    <div class="stat">
+                        <span class="stat-label">Rank</span>
+                        <span class="stat-value">
+                            <?php if ($myRank !== null): ?>#<?= $myRank ?> <small>of <?= $totalScores ?></small><?php else: ?>&mdash;<?php endif; ?>
+                        </span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Player</span>
+                        <span class="stat-value"><?= h($myName) ?></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Score</span>
+                        <span class="stat-value"><?= $myScore ?></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Clear time</span>
+                        <span class="stat-value"><?= h(format_time($myTime)) ?></span>
+                    </div>
+                </div>
+                <p class="hint-text">Hints used: <?= $myHints ?></p>
+                <!-- [END ADDED] -->
                 <?php if ($saveFailed): ?>
                     <!-- [ADDED] shown only if the score could not be written to scores.json -->
                     <p class="error">Your score could not be saved to the leaderboard. The server may not allow writing <code>scores.json</code>, so check the folder permissions.</p>
                     <!-- [END ADDED] -->
                 <?php endif; ?>
-                <?php if ($myIndex !== null): ?>
-                    <p>You placed <strong>#<?= $myIndex + 1 ?></strong> of <?= count($scores) ?>.</p>
-                <?php endif; ?>
+                <!-- [MODIFIED] removed the old "You placed #N of M" line; the rank is now the first box above -->
             </div>
         <?php endif; ?>
 
@@ -96,6 +123,19 @@ $shown = array_slice($scores, 0, BOARD_SIZE, true);
                             <td class="num"><?= $row['hints'] ?></td>
                         </tr>
                     <?php endforeach; ?>
+
+                    <?php if ($myIndex !== null && $myIndex >= BOARD_SIZE): ?>
+                        <!-- [ADDED] the player ranked below the top list, so their own row is shown after a gap -->
+                        <tr class="gap"><td colspan="5">&hellip;</td></tr>
+                        <tr class="me">
+                            <td><?= $myRank ?></td>
+                            <td><?= h($scores[$myIndex]['name']) ?> (you)</td>
+                            <td class="num"><?= $scores[$myIndex]['score'] ?></td>
+                            <td class="num"><?= h(format_time($scores[$myIndex]['time'])) ?></td>
+                            <td class="num"><?= $scores[$myIndex]['hints'] ?></td>
+                        </tr>
+                        <!-- [END ADDED] -->
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
