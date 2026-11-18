@@ -1,0 +1,432 @@
+/* ==========================================================
+   The Locked Study - shared stylesheet
+   Theme: a dim private study. Dark oak, green leather,
+   brass fittings, aged parchment, lamplight glow.
+   Used by login.php, escaperoom.php and leaderboard.php
+   ========================================================== */
+
+:root {
+    --wood-dark:   #1c120b;
+    --wood:        #2b1a10;
+    --wood-light:  #4a2f1c;
+    --leather:     #1f3328;
+    --leather-hi:  #2c4a39;
+    --parchment:   #f0e2c0;
+    --parchment-2: #e3d0a3;
+    --ink:         #2a1d12;
+    --brass:       #b8893b;
+    --brass-hi:    #e0b45f;
+    --brass-dark:  #7d5a22;
+    --burgundy:    #7a2a2a;
+    --lamp:        rgba(255, 196, 102, 0.16);
+    --good:        #2e6b3f;
+    --bad:         #8b2b2b;
+    --serif:       Georgia, "Palatino Linotype", Palatino, "Book Antiqua", serif;
+    --mono:        "Courier New", Courier, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { min-height: 100%; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 28px 16px 48px;
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--parchment);
+    background-color: var(--wood-dark);
+    /* lamplight pool + faint wood-plank stripes */
+    background-image:
+        radial-gradient(ellipse at 50% -10%, var(--lamp) 0%, transparent 60%),
+        repeating-linear-gradient(90deg,
+            rgba(0, 0, 0, 0.18) 0px,
+            rgba(0, 0, 0, 0.18) 2px,
+            transparent 2px,
+            transparent 90px),
+        linear-gradient(180deg, #24160d 0%, #160d07 100%);
+    background-attachment: fixed;
+}
+
+/* ---------- Page frame ---------- */
+
+.container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 32px 24px;
+    background: linear-gradient(180deg, var(--wood) 0%, #22140b 100%);
+    border: 3px solid var(--brass-dark);
+    border-radius: 6px;
+    box-shadow:
+        0 0 0 6px var(--wood-dark),
+        0 0 0 8px var(--brass-dark),
+        0 18px 50px rgba(0, 0, 0, 0.7),
+        inset 0 0 60px rgba(0, 0, 0, 0.45);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-areas:
+        "header  header"
+        "message message"
+        "main    aside"
+        "footer  footer";
+    gap: 20px 28px;
+}
+
+/* Pages without a sidebar (login, leaderboard) */
+.container.narrow {
+    display: block;
+    max-width: 760px;
+}
+
+header  { grid-area: header; }
+.message { grid-area: message; }
+main    { grid-area: main; min-width: 0; }
+aside   { grid-area: aside; }
+footer  { grid-area: footer; }
+
+/* ---------- Header ---------- */
+
+header {
+    text-align: center;
+    padding-bottom: 16px;
+    border-bottom: 2px double var(--brass-dark);
+}
+
+header h1 {
+    margin: 0 0 6px;
+    font-size: 2.1rem;
+    font-weight: normal;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brass-hi);
+    text-shadow: 0 2px 0 #000, 0 0 18px rgba(224, 180, 95, 0.35);
+}
+
+header p {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--parchment-2);
+    opacity: 0.85;
+}
+
+header .tagline {
+    font-style: italic;
+    font-size: 1rem;
+}
+
+/* ---------- Headings & text ---------- */
+
+h2 {
+    margin: 0 0 12px;
+    font-size: 1.45rem;
+    font-weight: normal;
+    color: var(--brass-hi);
+    letter-spacing: 0.04em;
+}
+
+h3 {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--brass-hi);
+}
+
+p { margin: 0 0 14px; }
+
+strong { color: var(--brass-hi); }
+
+small { color: var(--parchment-2); opacity: 0.85; }
+
+em { color: var(--parchment-2); }
+
+a { color: var(--brass-hi); }
+
+/* ---------- Parchment notes / riddles ---------- */
+
+blockquote {
+    margin: 16px 0;
+    padding: 16px 20px;
+    font-style: italic;
+    color: var(--ink);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.25), transparent 45%),
+        var(--parchment);
+    border-left: 6px solid var(--brass);
+    border-radius: 3px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55), inset 0 0 30px rgba(120, 80, 20, 0.25);
+}
+
+blockquote strong { color: var(--burgundy); font-style: normal; letter-spacing: 0.15em; }
+
+/* ---------- Flash message (green banner on a brass rail) ---------- */
+
+.message {
+    padding: 12px 18px;
+    background: var(--leather);
+    color: var(--parchment);
+    border: 1px solid var(--brass);
+    border-left: 6px solid var(--brass-hi);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.error {
+    margin: 0 0 16px;
+    padding: 12px 18px;
+    background: #3a1616;
+    color: #f3d3cf;
+    border: 1px solid var(--bad);
+    border-left: 6px solid #c0504d;
+    border-radius: 3px;
+}
+
+.good {
+    padding: 10px 14px;
+    color: #d9f0de;
+    background: rgba(46, 107, 63, 0.35);
+    border-left: 5px solid #4caf6a;
+    border-radius: 3px;
+}
+
+/* ---------- Buttons (brass plates) ---------- */
+
+.btn,
+button {
+    display: inline-block;
+    padding: 9px 18px;
+    font-family: var(--serif);
+    font-size: 0.98rem;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    color: #20140a;
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--brass-hi) 0%, var(--brass) 55%, var(--brass-dark) 100%);
+    border: 1px solid #5a3f14;
+    border-radius: 4px;
+    box-shadow: 0 2px 0 #4a3310, 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+.btn:hover,
+button:hover { filter: brightness(1.12); }
+
+.btn:active,
+button:active {
+    transform: translateY(2px);
+    box-shadow: 0 0 0 #4a3310, 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.btn:focus-visible,
+button:focus-visible,
+input:focus-visible {
+    outline: 3px solid var(--brass-hi);
+    outline-offset: 2px;
+}
+
+.btn.secondary {
+    color: var(--parchment);
+    background: linear-gradient(180deg, var(--leather-hi), var(--leather));
+    border-color: var(--brass-dark);
+    box-shadow: 0 2px 0 #0f1d15, 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Room object buttons ---------- */
+
+.objects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.objects .btn {
+    flex: 1 1 140px;
+    text-align: center;
+    padding: 14px 12px;
+    color: var(--parchment);
+    background: linear-gradient(180deg, var(--leather-hi) 0%, var(--leather) 100%);
+    border: 1px solid var(--brass);
+    box-shadow: 0 3px 0 #0f1d15, 0 5px 10px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(184, 137, 59, 0.25);
+}
+
+/* ---------- Forms ---------- */
+
+form { margin: 14px 0; }
+
+form.inline { display: inline-block; margin: 0; }
+
+label { display: block; margin-bottom: 10px; color: var(--parchment-2); }
+
+input[type="text"],
+input[type="number"] {
+    display: inline-block;
+    width: 100%;
+    max-width: 320px;
+    margin: 6px 10px 6px 0;
+    padding: 9px 12px;
+    font-family: var(--serif);
+    font-size: 1rem;
+    color: var(--ink);
+    background: var(--parchment);
+    border: 2px solid var(--brass-dark);
+    border-radius: 3px;
+    box-shadow: inset 0 2px 5px rgba(60, 35, 10, 0.35);
+}
+
+input[type="text"]::placeholder { color: #8a7650; font-style: italic; }
+
+/* Vault keypad */
+.digits {
+    display: inline-block;
+    margin: 6px 0 14px;
+    padding: 12px 24px;
+    font-family: var(--mono);
+    font-size: 2rem;
+    letter-spacing: 0.35em;
+    color: #8dff9f;
+    background: #08110b;
+    border: 3px solid #555;
+    border-radius: 4px;
+    box-shadow: inset 0 0 18px #000, 0 2px 8px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 0 8px rgba(141, 255, 159, 0.7);
+}
+
+/* ---------- Inventory sidebar (little leather pouch) ---------- */
+
+aside {
+    align-self: start;
+    padding: 16px 18px;
+    background: linear-gradient(180deg, var(--leather-hi), var(--leather));
+    border: 2px solid var(--brass-dark);
+    border-radius: 6px;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45), 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+aside ul { margin: 0; padding-left: 20px; }
+aside li { margin-bottom: 4px; text-transform: capitalize; }
+
+/* ---------- Footer ---------- */
+
+footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 2px double var(--brass-dark);
+}
+
+/* Footer links on narrow pages */
+.container.narrow footer { margin-top: 24px; justify-content: center; }
+
+/* ---------- Login page ---------- */
+
+.welcome {
+    margin: 20px 0;
+    padding: 18px 22px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--brass-dark);
+    border-radius: 4px;
+}
+
+.welcome ul { margin: 8px 0 0; padding-left: 22px; }
+
+.hint-text { font-size: 0.9rem; opacity: 0.8; }
+
+.resume {
+    margin: 0 0 18px;
+    padding: 12px 18px;
+    background: rgba(184, 137, 59, 0.15);
+    border: 1px dashed var(--brass);
+    border-radius: 4px;
+}
+
+/* ---------- Leaderboard ---------- */
+
+.result-card {
+    margin: 18px 0 22px;
+    padding: 18px 22px;
+    text-align: center;
+    color: var(--ink);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.25), transparent 45%),
+        var(--parchment);
+    border: 3px double var(--brass-dark);
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), inset 0 0 30px rgba(120, 80, 20, 0.25);
+}
+
+.result-card h2 { color: var(--burgundy); margin-bottom: 6px; }
+.result-card p  { margin: 4px 0; }
+.result-card strong { color: var(--burgundy); }
+
+.table-wrap { overflow-x: auto; }
+
+table.scores {
+    width: 100%;
+    margin: 12px 0 0;
+    border-collapse: collapse;
+    color: var(--ink);
+    background: var(--parchment);
+    border: 3px solid var(--brass-dark);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+}
+
+table.scores th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: normal;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    color: var(--parchment);
+    background: var(--leather);
+    border-bottom: 3px solid var(--brass);
+}
+
+table.scores td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(90, 63, 20, 0.3);
+}
+
+table.scores tr:nth-child(even) td { background: rgba(184, 137, 59, 0.12); }
+
+table.scores .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+table.scores tr.me td {
+    font-weight: bold;
+    background: rgba(224, 180, 95, 0.45);
+}
+
+.empty-board {
+    padding: 22px;
+    text-align: center;
+    font-style: italic;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px dashed var(--brass-dark);
+    border-radius: 4px;
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 720px) {
+    body { padding: 14px 8px 32px; }
+
+    .container {
+        padding: 18px 16px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "header"
+            "message"
+            "main"
+            "aside"
+            "footer";
+    }
+
+    header h1 { font-size: 1.6rem; }
+    .digits   { font-size: 1.5rem; padding: 10px 16px; }
+}
