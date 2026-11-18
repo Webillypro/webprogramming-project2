@@ -15,6 +15,10 @@ $myScore  = $finished ? (int)($_SESSION['score'] ?? 0) : 0;
 $myTime   = $finished ? (int)($_SESSION['elapsed_time'] ?? 0) : 0;
 $myHints  = $finished ? (int)($_SESSION['hints_used'] ?? 0) : 0;
 
+// [ADDED] true only if escaperoom.php tried to write scores.json and it failed
+$saveFailed = $finished && isset($_SESSION['score_saved']) && $_SESSION['score_saved'] === false;
+// [END ADDED]
+
 // Find this player's row so it can be highlighted (first exact match only).
 $myIndex = null;
 if ($finished) {
@@ -55,6 +59,11 @@ $shown = array_slice($scores, 0, BOARD_SIZE, true);
                 <p>Score: <strong><?= $myScore ?></strong> &nbsp;|&nbsp;
                    Time: <strong><?= h(format_time($myTime)) ?></strong> &nbsp;|&nbsp;
                    Hints used: <strong><?= $myHints ?></strong></p>
+                <?php if ($saveFailed): ?>
+                    <!-- [ADDED] shown only if the score could not be written to scores.json -->
+                    <p class="error">Your score could not be saved to the leaderboard. The server may not allow writing <code>scores.json</code>, so check the folder permissions.</p>
+                    <!-- [END ADDED] -->
+                <?php endif; ?>
                 <?php if ($myIndex !== null): ?>
                     <p>You placed <strong>#<?= $myIndex + 1 ?></strong> of <?= count($scores) ?>.</p>
                 <?php endif; ?>
