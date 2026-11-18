@@ -71,8 +71,18 @@ body {
         "message message"
         "main    aside"
         "footer  footer";
-    gap: 20px 28px;
+    /* [MODIFIED] was: gap: 20px 28px;
+       BUG FIX: the empty "message" grid row still got a 20px row gap, leaving a double gap under
+       the header whenever there was no flash message. Row spacing now comes from margins below. */
+    gap: 0 28px;
 }
+
+/* [ADDED] vertical spacing for the game page's grid (replaces the old row gap) */
+.container:not(.narrow) > header,
+.container:not(.narrow) > .message,
+.container:not(.narrow) > main,
+.container:not(.narrow) > aside { margin-bottom: 20px; }
+/* [END ADDED] */
 
 /* Pages without a sidebar (login, leaderboard) */
 .container.narrow {
@@ -115,6 +125,25 @@ header .tagline {
     font-style: italic;
     font-size: 1rem;
 }
+
+/* [ADDED] ---------- Live score in the game header ----------
+   --score is a registered integer, so a CSS animation can count it down smoothly.
+   The number is printed by a CSS counter; escaperoom.php supplies the starting value and
+   the animation (a per-page <style> block). No JavaScript is involved.
+   Needs a current browser (Chrome/Edge, Safari 16.4+, Firefox 128+). */
+@property --score {
+    syntax: '<integer>';
+    inherits: false;
+    initial-value: 0;
+}
+
+.live-score {
+    counter-reset: livescore var(--score);
+    font-variant-numeric: tabular-nums;
+}
+
+.live-score::before { content: counter(livescore); }
+/* [END ADDED] */
 
 /* ---------- Headings & text ---------- */
 
