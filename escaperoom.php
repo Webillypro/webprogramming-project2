@@ -114,11 +114,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hint = 'You have all three digits. Try them in order at the vault.';
             }
-            flash('HINT: ' . $hint . ' (-100 points)');
+            flash('HINT: ' . $hint . ' (-' . HINT_PENALTY . ' points)');
             go($view);
 
         case 'vault_code':
-            $given = preg_replace('/\D/', '', $_POST['code'] ?? '');
+            // [ADDED] BUG FIX (proposal edge case 5, "skipping ahead"): the vault used to open
+            // for the right code even if no puzzle had been solved, so the code could simply be
+            // guessed. All three digits must now be found first.
+            foreach ($VAULT_ORDER as $p) {
+                if (empty($_SESSION['solved'][$p])) {
+                    flash('The keypad does not respond. You have not found all three digits yet.');
+                    go('vault');
+                }
+            }
+            // [END ADDED]
+            $given = preg_replace('/\D/', '', post_str('code'));
 
             $real = '';
             foreach ($VAULT_ORDER as $p) $real .= $DIGITS[$p];
@@ -126,11 +136,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($given !== '' && hash_equals($real, $given)) {
                 $_SESSION['end_time']     = time();
                 $elapsed                  = $_SESSION['end_time'] - (int)$_SESSION['start_time'];
-                $score                    = max(0, 1000 - $elapsed - ((int)$_SESSION['hints_used'] * 100));
+                $score                    = calculate_score($elapsed, (int)$_SESSION['hints_used']);
                 $_SESSION['elapsed_time'] = $elapsed;
                 $_SESSION['score']        = $score;
 
-                save_score($_SESSION['player_name'], $score, $elapsed, (int)$_SESSION['hints_used']);
+                $_SESSION['score_saved'] = save_score($_SESSION['player_name'], $score, $elapsed, (int)$_SESSION['hints_used']);
 
                 header('Location: leaderboard.php');
                 exit;
@@ -151,6 +161,12 @@ unset($_SESSION['flash']);
 $elapsedNow = time() - (int)$_SESSION['start_time'];
 $mins = floor($elapsedNow / 60);
 $secs = $elapsedNow % 60;
+// [ADDED] Live score: START_SCORE minus 1 point per second minus 100 per hint (see scores.php).
+// This server-side number is the real one. The ticking number in the header is only a
+// CSS animation of it (no JavaScript), recalculated fresh on every page load.
+$currentScore = calculate_score($elapsedNow, (int)$_SESSION['hints_used']);
+$ticks        = (int)ceil($currentScore / POINTS_PER_SECOND);   // seconds until the score hits 0
+// [END ADDED]
 $foundDigits = [];
 foreach ($VAULT_ORDER as $p) {
     if (!empty($_SESSION['solved'][$p])) $foundDigits[$p] = $DIGITS[$p];
@@ -163,6 +179,14 @@ foreach ($VAULT_ORDER as $p) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Escape Room</title>
     <link rel="stylesheet" href="style.css">
+    <?php if ($ticks > 0): ?>
+    <!-- [ADDED] counts the header score down from its current value to 0, one step per second -->
+    <style>
+        @keyframes score-drop { from { --score: <?= $currentScore ?>; } to { --score: 0; } }
+        .live-score { animation: score-drop <?= $ticks ?>s steps(<?= $ticks ?>, end) forwards; }
+    </style>
+    <!-- [END ADDED] -->
+    <?php endif; ?>
 </head>
 <body>
 <div class="container">
@@ -173,6 +197,8 @@ foreach ($VAULT_ORDER as $p) {
             Player: <strong><?= h($_SESSION['player_name']) ?></strong> |
             Time: <?= $mins ?>m <?= $secs ?>s (refreshes when you act) |
             Hints used: <?= (int)$_SESSION['hints_used'] ?>
+            <!-- [ADDED] live score; style.css prints the number, the inline <style> above ticks it down -->
+            Score: <strong class="live-score" style="--score: <?= $currentScore ?>" aria-label="Current score <?= $currentScore ?>"></strong>
         </p>
     </header>
 
@@ -319,7 +345,7 @@ foreach ($VAULT_ORDER as $p) {
         <form method="post" class="inline">
             <input type="hidden" name="action" value="hint">
             <input type="hidden" name="view" value="<?= h($view) ?>">
-            <button type="submit" class="btn">Get a hint (-100 pts)</button>
+            <button type="submit" class="btn">Get a hint (-<?= HINT_PENALTY ?> pts)</button>
         </form>
         <a class="btn" href="reset.php">Restart</a>
     </footer>
