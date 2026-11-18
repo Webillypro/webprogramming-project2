@@ -10,7 +10,9 @@ Every puzzle answer is checked on the server. Answers and the final vault code l
 When the vault opens, PHP records the elapsed time, calculates a score, saves it to scores.json, and redirects to leaderboard.php.
 
 Files:
-login.php
-escaperoom.php
-leaderboard.php
-reset.php
+login.php        | Intro and rules, the name form. Sets player_name and start_time, and intializes inventory and solved.
+escaperoom.php   | Core gameplay: objects, puzzles, hints, inventory and the vault.
+leaderboard.php  | Shows ranked scores and the current player's position.
+reset.php        | Starts a new game: session_destroy(), then redirect to login.php.
+scores.php       | Helper to save and load scores. file_put_content(), LOCK_EX, json_decode(), usort().
+style.css        | Shared styling for every page.
