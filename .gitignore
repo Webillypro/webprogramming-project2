@@ -1,0 +1,2 @@
+# Registered accounts (password hashes) must never be committed to the public repo.
+data/users.php

@@ -71,18 +71,8 @@ body {
         "message message"
         "main    aside"
         "footer  footer";
-    /* [MODIFIED] was: gap: 20px 28px;
-       BUG FIX: the empty "message" grid row still got a 20px row gap, leaving a double gap under
-       the header whenever there was no flash message. Row spacing now comes from margins below. */
-    gap: 0 28px;
+    gap: 20px 28px;
 }
-
-/* [ADDED] vertical spacing for the game page's grid (replaces the old row gap) */
-.container:not(.narrow) > header,
-.container:not(.narrow) > .message,
-.container:not(.narrow) > main,
-.container:not(.narrow) > aside { margin-bottom: 20px; }
-/* [END ADDED] */
 
 /* Pages without a sidebar (login, leaderboard) */
 .container.narrow {
@@ -125,25 +115,6 @@ header .tagline {
     font-style: italic;
     font-size: 1rem;
 }
-
-/* [ADDED] ---------- Live score in the game header ----------
-   --score is a registered integer, so a CSS animation can count it down smoothly.
-   The number is printed by a CSS counter; escaperoom.php supplies the starting value and
-   the animation (a per-page <style> block). No JavaScript is involved.
-   Needs a current browser (Chrome/Edge, Safari 16.4+, Firefox 128+). */
-@property --score {
-    syntax: '<integer>';
-    inherits: false;
-    initial-value: 0;
-}
-
-.live-score {
-    counter-reset: livescore var(--score);
-    font-variant-numeric: tabular-nums;
-}
-
-.live-score::before { content: counter(livescore); }
-/* [END ADDED] */
 
 /* ---------- Headings & text ---------- */
 
@@ -221,6 +192,8 @@ blockquote strong { color: var(--burgundy); font-style: normal; letter-spacing: 
     border-radius: 3px;
 }
 
+div.good { margin: 0 0 16px; }
+
 /* ---------- Buttons (brass plates) ---------- */
 
 .btn,
@@ -291,6 +264,7 @@ form.inline { display: inline-block; margin: 0; }
 label { display: block; margin-bottom: 10px; color: var(--parchment-2); }
 
 input[type="text"],
+input[type="password"],
 input[type="number"] {
     display: inline-block;
     width: 100%;
@@ -393,47 +367,6 @@ footer {
 .result-card p  { margin: 4px 0; }
 .result-card strong { color: var(--burgundy); }
 
-/* [ADDED] ---------- Final result boxes on the leaderboard (rank, player, score, clear time) ---------- */
-.result-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-    margin: 14px 0 10px;
-}
-
-.stat {
-    padding: 10px 8px;
-    background: rgba(255, 255, 255, 0.35);
-    border: 1px solid var(--brass-dark);
-    border-radius: 4px;
-}
-
-.stat-label {
-    display: block;
-    font-size: 0.75rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #6b5230;
-}
-
-.stat-value {
-    display: block;
-    font-size: 1.5rem;
-    line-height: 1.3;
-    color: var(--burgundy);
-    overflow-wrap: anywhere;
-}
-
-.stat-value small { font-size: 0.85rem; color: var(--ink); opacity: 0.8; }
-
-/* "..." row separating the top list from the player's own row */
-table.scores tr.gap td {
-    text-align: center;
-    letter-spacing: 0.3em;
-    background: rgba(90, 63, 20, 0.12);
-}
-/* [END ADDED] */
-
 .table-wrap { overflow-x: auto; }
 
 table.scores {
@@ -496,8 +429,6 @@ table.scores tr.me td {
             "aside"
             "footer";
     }
-
-    .result-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* [ADDED] 2x2 boxes on phones */
 
     header h1 { font-size: 1.6rem; }
     .digits   { font-size: 1.5rem; padding: 10px 16px; }

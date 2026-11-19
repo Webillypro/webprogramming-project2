@@ -1,22 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 
-$_SESSION = [];
+require_login();
 
-if (ini_get('session.use_cookies')) {
-    $params = session_get_cookie_params();
-    setcookie(
-        session_name(),
-        '',
-        time() - 42000,
-        $params['path'],
-        $params['domain'],
-        $params['secure'],
-        $params['httponly']
-    );
+// Restart the puzzle only. The player stays logged in (use logout.php to end the session).
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_require();
+    game_init();
 }
 
-session_destroy();
-
-header('Location: login.php');
-exit;
+redirect('escaperoom.php');

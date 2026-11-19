@@ -1,45 +1,37 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/scores.php';
 
 const BOARD_SIZE = 20;
 
-function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
+// Anyone may look at the leaderboard; logged-in players also see their own result and row.
+$loggedIn = is_logged_in();
+$me       = current_username();
 
-$scores = load_scores();   // already sorted best-first; [] if file is missing or empty
+$runs  = load_scores();            // every finished run, best first; [] if file missing or empty
+$board = best_per_user($runs);     // one row per username (their best run)
 
-// Has this visitor just finished a game?
-$finished = !empty($_SESSION['end_time']) && !empty($_SESSION['player_name']);
-$myName   = $finished ? (string)$_SESSION['player_name'] : '';
+// Did this player just finish a game?
+$finished = $loggedIn && !empty($_SESSION['end_time']);
 $myScore  = $finished ? (int)($_SESSION['score'] ?? 0) : 0;
 $myTime   = $finished ? (int)($_SESSION['elapsed_time'] ?? 0) : 0;
 $myHints  = $finished ? (int)($_SESSION['hints_used'] ?? 0) : 0;
 
-// [ADDED] true only if escaperoom.php tried to write scores.json and it failed
-$saveFailed = $finished && isset($_SESSION['score_saved']) && $_SESSION['score_saved'] === false;
-// [END ADDED]
-
-// Find this player's row so it can be highlighted (first exact match only).
+// Position of this username on the board (highlighted row).
 $myIndex = null;
-if ($finished) {
-    foreach ($scores as $i => $row) {
-        if ($row['name'] === $myName && $row['score'] === $myScore && $row['time'] === $myTime) {
+if ($loggedIn) {
+    foreach ($board as $i => $row) {
+        if (strtolower($row['username']) === strtolower($me)) {
             $myIndex = $i;
             break;
         }
     }
 }
 
-// [ADDED] This player's final rank (1 = best) and how many scores are on the board.
-// $myRank stays null if the score is not in scores.json (for example, the save failed).
-$myRank      = ($myIndex !== null) ? $myIndex + 1 : null;
-$totalScores = count($scores);
-// [END ADDED]
-
 // A game is running but not finished: offer a way back.
-$inProgress = !empty($_SESSION['player_name']) && !empty($_SESSION['start_time']) && empty($_SESSION['end_time']);
+$inProgress = $loggedIn && !empty($_SESSION['start_time']) && empty($_SESSION['end_time']);
 
-$shown = array_slice($scores, 0, BOARD_SIZE, true);
+$shown = array_slice($board, 0, BOARD_SIZE, true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,51 +47,28 @@ $shown = array_slice($scores, 0, BOARD_SIZE, true);
     <header>
         <h1>The Locked Study</h1>
         <p class="tagline">Hall of Escapees</p>
+        <?php if ($loggedIn): ?>
+            <p>Logged in as <strong><?= h($me) ?></strong></p>
+        <?php endif; ?>
     </header>
 
     <main>
         <?php if ($finished): ?>
             <div class="result-card">
                 <h2>The vault swings open!</h2>
-                <!-- [MODIFIED] was: "Well done, NAME. You escaped." plus one line of Score | Time | Hints.
-                     The name, score and time now each have their own box below, together with the rank. -->
-                <p>Well done, you escaped the study!</p>
-
-                <!-- [ADDED] final result: rank, player name, final score and clear time -->
-                <div class="result-stats">
-                    <div class="stat">
-                        <span class="stat-label">Rank</span>
-                        <span class="stat-value">
-                            <?php if ($myRank !== null): ?>#<?= $myRank ?> <small>of <?= $totalScores ?></small><?php else: ?>&mdash;<?php endif; ?>
-                        </span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Player</span>
-                        <span class="stat-value"><?= h($myName) ?></span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Score</span>
-                        <span class="stat-value"><?= $myScore ?></span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Clear time</span>
-                        <span class="stat-value"><?= h(format_time($myTime)) ?></span>
-                    </div>
-                </div>
-                <p class="hint-text">Hints used: <?= $myHints ?></p>
-                <!-- [END ADDED] -->
-                <?php if ($saveFailed): ?>
-                    <!-- [ADDED] shown only if the score could not be written to scores.json -->
-                    <p class="error">Your score could not be saved to the leaderboard. The server may not allow writing <code>scores.json</code>, so check the folder permissions.</p>
-                    <!-- [END ADDED] -->
+                <p>Well done, <strong><?= h($me) ?></strong>. You escaped.</p>
+                <p>Score: <strong><?= $myScore ?></strong> &nbsp;|&nbsp;
+                   Time: <strong><?= h(format_time($myTime)) ?></strong> &nbsp;|&nbsp;
+                   Hints used: <strong><?= $myHints ?></strong></p>
+                <?php if ($myIndex !== null): ?>
+                    <p>Your best run ranks <strong>#<?= $myIndex + 1 ?></strong> of <?= count($board) ?> players.</p>
                 <?php endif; ?>
-                <!-- [MODIFIED] removed the old "You placed #N of M" line; the rank is now the first box above -->
             </div>
         <?php endif; ?>
 
         <h2>Top Scores</h2>
 
-        <?php if (empty($scores)): ?>
+        <?php if (empty($board)): ?>
             <div class="empty-board">No scores yet. Be the first to escape the study.</div>
         <?php else: ?>
             <div class="table-wrap">
@@ -107,50 +76,53 @@ $shown = array_slice($scores, 0, BOARD_SIZE, true);
                     <thead>
                         <tr>
                             <th>Rank</th>
-                            <th>Player</th>
+                            <th>Username</th>
                             <th class="num">Score</th>
                             <th class="num">Time</th>
                             <th class="num">Hints</th>
+                            <th class="num">Escapes</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php foreach ($shown as $i => $row): ?>
                         <tr<?= $i === $myIndex ? ' class="me"' : '' ?>>
                             <td><?= $i + 1 ?></td>
-                            <td><?= h($row['name']) ?><?= $i === $myIndex ? ' (you)' : '' ?></td>
+                            <td><?= h($row['username']) ?><?= $i === $myIndex ? ' (you)' : '' ?></td>
                             <td class="num"><?= $row['score'] ?></td>
                             <td class="num"><?= h(format_time($row['time'])) ?></td>
                             <td class="num"><?= $row['hints'] ?></td>
+                            <td class="num"><?= $row['games'] ?></td>
                         </tr>
                     <?php endforeach; ?>
-
-                    <?php if ($myIndex !== null && $myIndex >= BOARD_SIZE): ?>
-                        <!-- [ADDED] the player ranked below the top list, so their own row is shown after a gap -->
-                        <tr class="gap"><td colspan="5">&hellip;</td></tr>
-                        <tr class="me">
-                            <td><?= $myRank ?></td>
-                            <td><?= h($scores[$myIndex]['name']) ?> (you)</td>
-                            <td class="num"><?= $scores[$myIndex]['score'] ?></td>
-                            <td class="num"><?= h(format_time($scores[$myIndex]['time'])) ?></td>
-                            <td class="num"><?= $scores[$myIndex]['hints'] ?></td>
-                        </tr>
-                        <!-- [END ADDED] -->
-                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-            <?php if (count($scores) > BOARD_SIZE): ?>
-                <p class="hint-text" style="margin-top:10px;">Showing the top <?= BOARD_SIZE ?> of <?= count($scores) ?> scores.</p>
-            <?php endif; ?>
+            <p class="hint-text" style="margin-top:10px;">
+                Each player is listed once, with their best run.
+                <?php if (count($board) > BOARD_SIZE): ?>
+                    Showing the top <?= BOARD_SIZE ?> of <?= count($board) ?> players.
+                <?php endif; ?>
+            </p>
         <?php endif; ?>
     </main>
 
     <footer>
-        <?php if ($inProgress): ?>
-            <a class="btn secondary" href="escaperoom.php">Return to game</a>
+        <?php if ($loggedIn): ?>
+            <?php if ($inProgress): ?>
+                <a class="btn secondary" href="escaperoom.php">Return to game</a>
+            <?php endif; ?>
+            <form method="post" action="reset.php" class="inline">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn"><?= $inProgress ? 'Start over' : 'Play again' ?></button>
+            </form>
+            <form method="post" action="logout.php" class="inline">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn secondary">Log out</button>
+            </form>
+        <?php else: ?>
+            <a class="btn" href="login.php">Log in</a>
+            <a class="btn secondary" href="register.php">Register</a>
         <?php endif; ?>
-        <a class="btn" href="reset.php"><?= ($finished || !$inProgress) ? 'Play again' : 'Start over' ?></a>
-        <a class="btn secondary" href="login.php">Back to start</a>
     </footer>
 
 </div>

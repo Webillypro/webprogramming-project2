@@ -1,10 +1,13 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';      // starts the session, provides h(), csrf and login helpers
 require_once __DIR__ . '/includes/scores.php';
 
-if (empty($_SESSION['player_name']) || empty($_SESSION['start_time'])) {
-    header('Location: login.php');
-    exit;
+// Session check: nobody gets into the room without being logged in.
+require_login();
+
+// First visit after logging in (or after logging in again): start the game and the timer.
+if (empty($_SESSION['start_time'])) {
+    game_init();
 }
 if (!empty($_SESSION['end_time'])) {
     header('Location: leaderboard.php');
@@ -39,19 +42,11 @@ function add_item(string $item): void {
     if (!has_item($item)) $_SESSION['inventory'][] = $item;
 }
 function clean(string $s): string { return strtolower(trim($s)); }
-function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
-
-// [ADDED] BUG FIX: a tampered form (e.g. answer[]=x or code[]=1) sent an array where the code
-// expects a string, which crashed the page with a fatal TypeError (HTTP 500).
-// post_str() returns the posted value only if it is a plain string, otherwise ''.
-function post_str(string $key): string {
-    $v = $_POST[$key] ?? '';
-    return is_string($v) ? $v : '';
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = post_str('action');
-    $view   = post_str('view');
+    csrf_require();
+    $action = $_POST['action'] ?? '';
+    $view   = $_POST['view'] ?? 'room';
     if (!in_array($view, $VIEWS, true)) $view = 'room';
 
     switch ($action) {
@@ -77,8 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             go('desk');
 
         case 'answer':
-            $puzzle = post_str('puzzle');
-            $given  = clean(post_str('answer'));
+            $puzzle = $_POST['puzzle'] ?? '';
+            $given  = clean($_POST['answer'] ?? '');
             if (!isset($ANSWERS[$puzzle])) go('room');
 
             if ($puzzle === 'cipher' && empty($_SESSION['solved']['drawer'])) {
@@ -114,21 +109,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hint = 'You have all three digits. Try them in order at the vault.';
             }
-            flash('HINT: ' . $hint . ' (-' . HINT_PENALTY . ' points)');
+            flash('HINT: ' . $hint . ' (-100 points)');
             go($view);
 
         case 'vault_code':
-            // [ADDED] BUG FIX (proposal edge case 5, "skipping ahead"): the vault used to open
-            // for the right code even if no puzzle had been solved, so the code could simply be
-            // guessed. All three digits must now be found first.
-            foreach ($VAULT_ORDER as $p) {
-                if (empty($_SESSION['solved'][$p])) {
-                    flash('The keypad does not respond. You have not found all three digits yet.');
-                    go('vault');
-                }
-            }
-            // [END ADDED]
-            $given = preg_replace('/\D/', '', post_str('code'));
+            $given = preg_replace('/\D/', '', $_POST['code'] ?? '');
 
             $real = '';
             foreach ($VAULT_ORDER as $p) $real .= $DIGITS[$p];
@@ -136,11 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($given !== '' && hash_equals($real, $given)) {
                 $_SESSION['end_time']     = time();
                 $elapsed                  = $_SESSION['end_time'] - (int)$_SESSION['start_time'];
-                $score                    = calculate_score($elapsed, (int)$_SESSION['hints_used']);
+                $score                    = max(0, 1000 - $elapsed - ((int)$_SESSION['hints_used'] * 100));
                 $_SESSION['elapsed_time'] = $elapsed;
                 $_SESSION['score']        = $score;
 
-                $_SESSION['score_saved'] = save_score($_SESSION['player_name'], $score, $elapsed, (int)$_SESSION['hints_used']);
+                save_score(current_username(), $score, $elapsed, (int)$_SESSION['hints_used']);
 
                 header('Location: leaderboard.php');
                 exit;
@@ -161,12 +146,6 @@ unset($_SESSION['flash']);
 $elapsedNow = time() - (int)$_SESSION['start_time'];
 $mins = floor($elapsedNow / 60);
 $secs = $elapsedNow % 60;
-// [ADDED] Live score: START_SCORE minus 1 point per second minus 100 per hint (see scores.php).
-// This server-side number is the real one. The ticking number in the header is only a
-// CSS animation of it (no JavaScript), recalculated fresh on every page load.
-$currentScore = calculate_score($elapsedNow, (int)$_SESSION['hints_used']);
-$ticks        = (int)ceil($currentScore / POINTS_PER_SECOND);   // seconds until the score hits 0
-// [END ADDED]
 $foundDigits = [];
 foreach ($VAULT_ORDER as $p) {
     if (!empty($_SESSION['solved'][$p])) $foundDigits[$p] = $DIGITS[$p];
@@ -179,14 +158,6 @@ foreach ($VAULT_ORDER as $p) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Escape Room</title>
     <link rel="stylesheet" href="style.css">
-    <?php if ($ticks > 0): ?>
-    <!-- [ADDED] counts the header score down from its current value to 0, one step per second -->
-    <style>
-        @keyframes score-drop { from { --score: <?= $currentScore ?>; } to { --score: 0; } }
-        .live-score { animation: score-drop <?= $ticks ?>s steps(<?= $ticks ?>, end) forwards; }
-    </style>
-    <!-- [END ADDED] -->
-    <?php endif; ?>
 </head>
 <body>
 <div class="container">
@@ -194,11 +165,9 @@ foreach ($VAULT_ORDER as $p) {
     <header>
         <h1>The Locked Study</h1>
         <p>
-            Player: <strong><?= h($_SESSION['player_name']) ?></strong> |
+            Player: <strong><?= h(current_username()) ?></strong> |
             Time: <?= $mins ?>m <?= $secs ?>s (refreshes when you act) |
             Hints used: <?= (int)$_SESSION['hints_used'] ?>
-            <!-- [ADDED] live score; style.css prints the number, the inline <style> above ticks it down -->
-            Score: <strong class="live-score" style="--score: <?= $currentScore ?>" aria-label="Current score <?= $currentScore ?>"></strong>
         </p>
     </header>
 
@@ -226,6 +195,7 @@ foreach ($VAULT_ORDER as $p) {
         <p>The rug is frayed at one corner. Something glints beneath it.</p>
         <?php if (!has_item('brass key')): ?>
             <form method="post">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="take_key">
                 <input type="hidden" name="view" value="rug">
                 <button type="submit" class="btn">Take the small brass key</button>
@@ -247,6 +217,7 @@ foreach ($VAULT_ORDER as $p) {
         <?php else: ?>
             <form method="post">
                 <input type="hidden" name="action" value="answer">
+                <?= csrf_field() ?>
                 <input type="hidden" name="puzzle" value="shelf">
                 <input type="hidden" name="view" value="bookshelf">
                 <label>Your answer: <input type="text" name="answer" autocomplete="off" required></label>
@@ -261,6 +232,7 @@ foreach ($VAULT_ORDER as $p) {
             <p>A tidy desk with a single locked drawer. A tiny brass lock is set into the front.</p>
             <?php if (has_item('brass key')): ?>
                 <form method="post">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="use_key">
                     <input type="hidden" name="view" value="desk">
                     <button type="submit" class="btn">Use the brass key</button>
@@ -276,6 +248,7 @@ foreach ($VAULT_ORDER as $p) {
             <?php else: ?>
                 <form method="post">
                     <input type="hidden" name="action" value="answer">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="puzzle" value="cipher">
                     <input type="hidden" name="view" value="desk">
                     <label>What does it say? <input type="text" name="answer" autocomplete="off" required></label>
@@ -295,6 +268,7 @@ foreach ($VAULT_ORDER as $p) {
         <?php else: ?>
             <form method="post">
                 <input type="hidden" name="action" value="answer">
+                <?= csrf_field() ?>
                 <input type="hidden" name="puzzle" value="painting">
                 <input type="hidden" name="view" value="painting">
                 <label>Result: <input type="text" name="answer" inputmode="numeric" autocomplete="off" required></label>
@@ -314,6 +288,7 @@ foreach ($VAULT_ORDER as $p) {
         <p><small>The code is the three digits in the order you found their clues:
            bookshelf, desk, painting.</small></p>
         <form method="post">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="vault_code">
             <input type="hidden" name="view" value="vault">
             <label>Enter code:
@@ -343,11 +318,19 @@ foreach ($VAULT_ORDER as $p) {
             <a class="btn" href="?view=room">Back to room</a>
         <?php endif; ?>
         <form method="post" class="inline">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="hint">
             <input type="hidden" name="view" value="<?= h($view) ?>">
-            <button type="submit" class="btn">Get a hint (-<?= HINT_PENALTY ?> pts)</button>
+            <button type="submit" class="btn">Get a hint (-100 pts)</button>
         </form>
-        <a class="btn" href="reset.php">Restart</a>
+        <form method="post" action="reset.php" class="inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn">Restart</button>
+        </form>
+        <form method="post" action="logout.php" class="inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn secondary">Log out</button>
+        </form>
     </footer>
 
 </div>
