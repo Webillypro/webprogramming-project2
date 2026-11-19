@@ -1,10 +1,10 @@
 <?php
 /**
  * Score helpers shared by escaperoom.php and leaderboard.php.
- * Scores live in scores.json in the project root.
+ * Scores live in scores.json inside the data folder (see storage.php for where that is).
  */
 
-const SCORES_FILE = __DIR__ . '/../scores.json';
+require_once __DIR__ . '/storage.php';
 
 /**
  * Load every saved score, best first.
@@ -13,11 +13,11 @@ const SCORES_FILE = __DIR__ . '/../scores.json';
  */
 function load_scores(): array
 {
-    if (!is_file(SCORES_FILE) || !is_readable(SCORES_FILE)) {
+    if (!is_file(scores_file()) || !is_readable(scores_file())) {
         return [];
     }
 
-    $raw  = file_get_contents(SCORES_FILE);
+    $raw  = file_get_contents(scores_file());
     $data = ($raw === false || trim($raw) === '') ? [] : json_decode($raw, true);
 
     if (!is_array($data)) {
@@ -78,8 +78,14 @@ function best_per_user(array $scores): array
  */
 function save_score(string $username, int $score, int $elapsed, int $hints): bool
 {
-    $fh = fopen(SCORES_FILE, 'c+');   // creates the file if it does not exist
+    $dir = dirname(scores_file());
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    $fh = @fopen(scores_file(), 'c+');   // creates the file if it does not exist
     if ($fh === false) {
+        storage_problem('Could not open the scores file.', scores_file());   // logs the reason
         return false;
     }
 

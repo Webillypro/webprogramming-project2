@@ -53,6 +53,10 @@ $shown = array_slice($board, 0, BOARD_SIZE, true);
     </header>
 
     <main>
+        <?php if ($finished && !empty($_SESSION['score_save_failed'])): ?>
+            <div class="error" role="alert">Your score could not be saved because the scores file is not writable. Ask the site owner to check permissions on the data folder.</div>
+        <?php endif; ?>
+
         <?php if ($finished): ?>
             <div class="result-card">
                 <h2>The vault swings open!</h2>

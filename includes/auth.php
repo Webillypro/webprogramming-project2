@@ -28,6 +28,29 @@ function h(string $s): string
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Build the message for a file-storage failure and log the real reason.
+ * Visitors only see the short message. When the page is opened from the same computer
+ * (localhost) the technical detail is appended too, so setup problems are easy to diagnose
+ * without leaking server paths to other people.
+ */
+function storage_problem(string $msg, string $path): string
+{
+    $err    = error_get_last();
+    $reason = is_array($err) ? (string)$err['message'] : 'no PHP error recorded';
+    $runner = (function_exists('posix_geteuid') && function_exists('posix_getpwuid'))
+        ? (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown')
+        : get_current_user();
+
+    error_log("[escape-room] $msg path=$path reason=$reason php_user=$runner");
+
+    $local = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+    if ($local) {
+        $msg .= " [Details: $reason | path: $path | PHP is running as: $runner]";
+    }
+    return $msg;
+}
+
 /** Redirect and stop. */
 function redirect(string $url): void
 {
@@ -97,7 +120,7 @@ function game_init(): void
     $_SESSION['inventory']  = [];
     $_SESSION['solved']     = [];
     $_SESSION['hints_used'] = 0;
-    unset($_SESSION['end_time'], $_SESSION['elapsed_time'], $_SESSION['score'], $_SESSION['flash']);
+    unset($_SESSION['end_time'], $_SESSION['elapsed_time'], $_SESSION['score'], $_SESSION['flash'], $_SESSION['score_save_failed']);
 }
 
 /* ---------- CSRF protection for every POST form ---------- */

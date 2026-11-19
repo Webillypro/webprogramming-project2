@@ -12,8 +12,9 @@
  * data/users.php is also listed in .gitignore so hashes are never pushed to GitHub.
  */
 
-const USERS_FILE   = __DIR__ . '/../data/users.php';
-const USERS_GUARD  = "<?php http_response_code(404); exit; ?>\n";
+require_once __DIR__ . '/storage.php';    // users_file(): data/users.php, or a writable fallback
+
+const USERS_GUARD  ="<?php http_response_code(404); exit; ?>\n";
 const USER_MIN     = 3;
 const USER_MAX     = 20;
 const PASS_MIN     = 8;
@@ -38,10 +39,10 @@ function users_decode($raw): array
 /** Read every user (shared lock so we never read a half-written file). */
 function users_load(): array
 {
-    if (!is_file(USERS_FILE) || !is_readable(USERS_FILE)) {
+    if (!is_file(users_file()) || !is_readable(users_file())) {
         return [];
     }
-    $fh = fopen(USERS_FILE, 'r');
+    $fh = fopen(users_file(), 'r');
     if ($fh === false) {
         return [];
     }
@@ -95,18 +96,18 @@ function validate_password(string $p, string $confirm): string
  */
 function create_user(string $username, string $password): string
 {
-    $dir = dirname(USERS_FILE);
+    $dir = dirname(users_file());
     if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-        return 'Could not create the data folder. Check folder permissions.';
+        return storage_problem('Could not create the data folder. Check folder permissions.', $dir);
     }
 
-    $fh = @fopen(USERS_FILE, 'c+');
+    $fh = @fopen(users_file(), 'c+');
     if ($fh === false) {
-        return 'Could not open the user file. Check file permissions.';
+        return storage_problem('Could not open the user file. Check file permissions.', users_file());
     }
     if (!flock($fh, LOCK_EX)) {
         fclose($fh);
-        return 'Could not lock the user file. Please try again.';
+        return storage_problem('Could not lock the user file. Please try again.', users_file());
     }
 
     $users = users_decode(stream_get_contents($fh));
