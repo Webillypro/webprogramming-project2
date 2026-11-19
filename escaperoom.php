@@ -1,11 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/scores.php';
 require_once __DIR__ . '/includes/attempts.php';
 
-if (empty($_SESSION['player_name']) || empty($_SESSION['start_time'])) {
-    header('Location: login.php');
-    exit;
+require_login();
+
+if (empty($_SESSION['start_time'])) {
+    game_init();
 }
 if (!empty($_SESSION['end_time'])) {
     header('Location: leaderboard.php');
@@ -16,6 +17,8 @@ foreach (['inventory', 'solved', 'hint_ptr', 'wrong_attempts', 'lockout_until', 
     if (!isset($_SESSION[$key]) || !is_array($_SESSION[$key])) $_SESSION[$key] = [];
 }
 if (!isset($_SESSION['hints_used'])) $_SESSION['hints_used'] = 0;
+
+$HINT_COST = 100;
 
 $rooms = [
     'rug' => [
@@ -103,11 +106,11 @@ function add_item(string $item): void {
 
 function clean(string $s): string { return strtolower(trim($s)); }
 
-function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
-
-function post_str(string $key): string {
-    $v = $_POST[$key] ?? '';
-    return is_string($v) ? $v : '';
+if (!function_exists('post_str')) {
+    function post_str(string $key): string {
+        $v = $_POST[$key] ?? '';
+        return is_string($v) ? $v : '';
+    }
 }
 
 function lock_seconds_left(string $roomId): int {
@@ -115,6 +118,7 @@ function lock_seconds_left(string $roomId): int {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_require();
     $action = post_str('action');
     $view   = post_str('view');
     if (!in_array($view, $VIEWS, true)) $view = 'room';
@@ -192,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $_SESSION['hint_ptr'][$view] = $ptr + 1;
                 $_SESSION['hints_used']++;
-                flash('Hint ' . ($ptr + 1) . ' of ' . $total . ' revealed (-' . HINT_PENALTY . ' points).');
+                flash('Hint ' . ($ptr + 1) . ' of ' . $total . ' revealed (-' . $HINT_COST . ' points).');
             }
             go($view);
 
@@ -211,11 +215,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($given !== '' && hash_equals($real, $given)) {
                 $_SESSION['end_time']     = time();
                 $elapsed                  = $_SESSION['end_time'] - (int)$_SESSION['start_time'];
-                $score                    = calculate_score($elapsed, (int)$_SESSION['hints_used']);
+                $score                    = max(0, 1000 - $elapsed - ((int)$_SESSION['hints_used'] * $HINT_COST));
                 $_SESSION['elapsed_time'] = $elapsed;
                 $_SESSION['score']        = $score;
 
-                $_SESSION['score_saved'] = save_score($_SESSION['player_name'], $score, $elapsed, (int)$_SESSION['hints_used']);
+                if (!save_score(current_username(), $score, $elapsed, (int)$_SESSION['hints_used'])) {
+                    $_SESSION['score_save_failed'] = true;
+                }
 
                 header('Location: leaderboard.php');
                 exit;
@@ -237,9 +243,6 @@ $elapsedNow = time() - (int)$_SESSION['start_time'];
 $mins = floor($elapsedNow / 60);
 $secs = $elapsedNow % 60;
 
-$currentScore = calculate_score($elapsedNow, (int)$_SESSION['hints_used']);
-$ticks        = (int)ceil($currentScore / POINTS_PER_SECOND);
-
 $foundDigits = [];
 foreach ($VAULT_ORDER as $p) {
     if (!empty($_SESSION['solved'][$p])) $foundDigits[$p] = $rooms[$p]['digit'];
@@ -247,9 +250,9 @@ foreach ($VAULT_ORDER as $p) {
 
 $clearance = (int)round(count($_SESSION['clean_solves']) / count($PUZZLE_ROOMS) * 100);
 
-$hintTotal   = isset($rooms[$view]) ? count($rooms[$view]['hints']) : 0;
-$hintPtr     = (int)($_SESSION['hint_ptr'][$view] ?? 0);
-$lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
+$hintTotal = isset($rooms[$view]) ? count($rooms[$view]['hints']) : 0;
+$hintPtr   = (int)($_SESSION['hint_ptr'][$view] ?? 0);
+$lockLeft  = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -258,12 +261,6 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Escape Room</title>
     <link rel="stylesheet" href="style.css">
-    <?php if ($ticks > 0): ?>
-    <style>
-        @keyframes score-drop { from { --score: <?= $currentScore ?>; } to { --score: 0; } }
-        .live-score { animation: score-drop <?= $ticks ?>s steps(<?= $ticks ?>, end) forwards; }
-    </style>
-    <?php endif; ?>
 </head>
 <body>
 <div class="container">
@@ -271,10 +268,9 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
     <header>
         <h1>The Locked Study</h1>
         <p>
-            Player: <strong><?= h($_SESSION['player_name']) ?></strong> |
+            Player: <strong><?= h(current_username()) ?></strong> |
             Time: <?= $mins ?>m <?= $secs ?>s (refreshes when you act) |
             Hints used: <?= (int)$_SESSION['hints_used'] ?>
-            Score: <strong class="live-score" style="--score: <?= $currentScore ?>" aria-label="Current score <?= $currentScore ?>"></strong>
         </p>
     </header>
 
@@ -309,6 +305,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
         <p>The rug is frayed at one corner. Something glints beneath it.</p>
         <?php if (!has_item('brass key')): ?>
             <form method="post">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="take_key">
                 <input type="hidden" name="view" value="rug">
                 <button type="submit" class="btn">Take the small brass key</button>
@@ -329,6 +326,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
             <p class="good">Solved! The digit behind the slip is <strong><?= h($rooms['bookshelf']['digit']) ?></strong>.</p>
         <?php else: ?>
             <form method="post">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="answer">
                 <input type="hidden" name="room" value="bookshelf">
                 <input type="hidden" name="view" value="bookshelf">
@@ -344,6 +342,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
             <p>A tidy desk with a single locked drawer. A tiny brass lock is set into the front.</p>
             <?php if (has_item('brass key')): ?>
                 <form method="post">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="use_key">
                     <input type="hidden" name="view" value="desk">
                     <button type="submit" class="btn">Use the brass key</button>
@@ -358,6 +357,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
                 <p class="good">Solved! The digit is <strong><?= h($rooms['desk']['digit']) ?></strong>.</p>
             <?php else: ?>
                 <form method="post">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="answer">
                     <input type="hidden" name="room" value="desk">
                     <input type="hidden" name="view" value="desk">
@@ -377,6 +377,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
             <p class="good">Solved! The digit behind the frame is <strong><?= h($rooms['painting']['digit']) ?></strong>.</p>
         <?php else: ?>
             <form method="post">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="answer">
                 <input type="hidden" name="room" value="painting">
                 <input type="hidden" name="view" value="painting">
@@ -397,6 +398,7 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
         <p><small>The code is the three digits in the order you found their clues:
            bookshelf, desk, painting.</small></p>
         <form method="post">
+            <?= csrf_field() ?>
             <input type="hidden" name="action" value="vault_code">
             <input type="hidden" name="view" value="vault">
             <label>Enter code:
@@ -440,14 +442,22 @@ $lockLeft    = isset($rooms[$view]) ? lock_seconds_left($view) : 0;
         <?php if ($view !== 'room'): ?>
             <a class="btn" href="?view=room">Back to room</a>
             <form method="post" class="inline">
+                <?= csrf_field() ?>
                 <input type="hidden" name="action" value="hint">
                 <input type="hidden" name="view" value="<?= h($view) ?>">
                 <button type="submit" class="btn"<?= ($lockLeft > 0 || $hintPtr >= $hintTotal) ? ' disabled' : '' ?>>
-                    Get a hint (<?= $hintPtr ?>/<?= $hintTotal ?> used, -<?= HINT_PENALTY ?> pts)
+                    Get a hint (<?= $hintPtr ?>/<?= $hintTotal ?> used, -<?= $HINT_COST ?> pts)
                 </button>
             </form>
         <?php endif; ?>
-        <a class="btn" href="reset.php">Restart</a>
+        <form method="post" action="reset.php" class="inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn">Restart</button>
+        </form>
+        <form method="post" action="logout.php" class="inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn secondary">Log out</button>
+        </form>
     </footer>
 
 </div>
